@@ -1,0 +1,94 @@
+apply plugin: 'java'
+version = '1.0'
+libsDirName = 'lib'
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+task "create-dirs" << {
+   sourceSets*.java.srcDirs*.each { it.mkdirs() }
+   sourceSets*.resources.srcDirs*.each { it.mkdirs() }
+}
+
+import org.ajoberstar.gradle.git.tasks.*
+
+/*
+//add git repo as dependency
+task gradle_projects_skeleton(type: GitClone) {
+        def destination = file("repos/gradle-projects-skeleton")
+        uri = "https://github.com/YamStranger/gradle-projects-skeleton.git"
+        destinationPath = destination
+        bare = false
+        enabled = !destination.exists() //to clone only once
+}
+*/
+
+sourceSets {
+    integTest {
+        java.srcDir file('src/integTest/java')
+        resources.srcDir file('src/integTest/resources')
+        compileClasspath += sourceSets.main.runtimeClasspath
+        runtimeClasspath = output + compileClasspath
+    }
+}
+
+task intTest(type: Test) {
+    testClassesDir = sourceSets.integTest.output.classesDir
+    classpath += sourceSets.integTest.runtimeClasspath
+}
+
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+		classpath 'org.ajoberstar:gradle-git:0.2.3'
+    }
+}
+
+repositories {
+        mavenCentral()
+}
+
+dependencies {
+}
+
+test {
+    useTestNG {
+        excludeGroups 'integrationTests'
+        //includeGroups 'unitTests'
+    }
+}
+
+task copyDeps(type: Copy) {
+  from configurations.runtime
+  into project.projectDir.path+'/lib'
+}
+
+compileJava {
+	dependsOn ('create-dirs')
+}
+
+jar {
+    manifest {
+        attributes 'Implementation-Title': 'title',
+                   'Implementation-Version': version,
+				   'Main-Class': 'com.Main'
+				    //attributes(
+					//    'Class-Path': configurations.compile.collect { it.getName() }.join(' '))
+    }
+}
+
+
+//create a single Jar with all dependencies
+task buildAllInOne(type: Jar) {
+	manifest {
+        attributes 'Implementation-Title': 'title',
+        	'Implementation-Version': version,
+        	'Main-Class': 'com.Main'
+    }
+    baseName = project.name + '-all'
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+}
+

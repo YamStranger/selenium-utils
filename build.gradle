@@ -11,16 +11,13 @@ task "create-dirs" << {
 
 import org.ajoberstar.gradle.git.tasks.*
 
-/*
-//add git repo as dependency
-task gradle_projects_skeleton(type: GitClone) {
-        def destination = file("repos/gradle-projects-skeleton")
-        uri = "https://github.com/YamStranger/gradle-projects-skeleton.git"
+task utils(type: GitClone) {
+        def destination = file("repos/utils")
+        uri = "https://github.com/YamStranger/utils.git"
         destinationPath = destination
         bare = false
         enabled = !destination.exists() //to clone only once
 }
-*/
 
 sourceSets {
     integTest {
@@ -51,6 +48,15 @@ repositories {
 }
 
 dependencies {
+   compile('org.seleniumhq.selenium:selenium-java:2.45.0')
+   compile('org.testng:testng:6.8.21:sources')
+   compile('org.testng:testng:6.8.21')
+   compile('org.mockito:mockito-core:2.0.5-beta')
+   compile('org.mockito:mockito-core:2.0.5-beta:sources')
+   compile('ch.qos.logback:logback-classic:1.1.3:sources')
+   compile('ch.qos.logback:logback-classic:1.1.3')
+   compile('ch.qos.logback:logback-classic:1.1.3')
+   compile project(':repos/utils')
 }
 
 test {
@@ -66,7 +72,7 @@ task copyDeps(type: Copy) {
 }
 
 compileJava {
-	dependsOn ('create-dirs')
+	dependsOn ('create-dirs','utils','copyDeps')
 }
 
 jar {

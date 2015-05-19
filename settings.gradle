@@ -16,5 +16,5 @@ include 'api'
 include 'services:webservice'
 */
 
-rootProject.name = 'tool-moe-gov-sa'
+rootProject.name = 'selenium-utils'
 include 'repos/utils'

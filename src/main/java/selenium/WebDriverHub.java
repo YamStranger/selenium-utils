@@ -14,6 +14,7 @@ import java.net.URL;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * User: YamStranger
@@ -61,31 +62,29 @@ public class WebDriverHub {
 
         WebDriver driver = null;
         if (remote) {
-            boolean firefox = true;
-            do {
+            boolean isFirefox = ThreadLocalRandom.current().nextBoolean();
+            do try {
+                if (isFirefox) {
+                    isFirefox = false;
+                    DesiredCapabilities firefox = DesiredCapabilities.firefox();
+                    firefox.setBrowserName("firefox");
+                    firefox.setPlatform(Platform.ANY);
+                    firefox.setVersion("ANY");
+                    driver = new RemoteWebDriver(new URL("http://127.0.0.1:4444/wd/hub"), firefox);
+                } else {
+                    isFirefox = true;
+                    DesiredCapabilities chrome = DesiredCapabilities.chrome();
+                    chrome.setBrowserName("chrome");
+                    chrome.setPlatform(Platform.ANY);
+                    chrome.setVersion("ANY");
+                    driver = new RemoteWebDriver(new URL("http://127.0.0.1:4444/wd/hub"), chrome);
+                }
+            } catch (Exception e) {
+                isFirefox = !isFirefox;
+                logger.error("some exception during requesting browser", e);
                 try {
-                    if (firefox) {
-                        firefox = false;
-                        DesiredCapabilities capability = DesiredCapabilities.firefox();
-                        capability.setBrowserName("firefox");
-                        capability.setPlatform(Platform.ANY);
-                        capability.setVersion("ANY");
-                        driver = new RemoteWebDriver(new URL("http://127.0.0.1:4444/wd/hub"), capability);
-                    } else {
-                        firefox = true;
-                        DesiredCapabilities capability = DesiredCapabilities.chrome();
-                        capability.setBrowserName("chrome");
-                        capability.setPlatform(Platform.ANY);
-                        capability.setVersion("ANY");
-                        driver = new RemoteWebDriver(new URL("http://127.0.0.1:4444/wd/hub"), capability);
-
-                    }
-                } catch (Exception e) {
-                    logger.error("some exception during requesting browser", e);
-                    try {
-                        Thread.sleep(2000);
-                    } catch (InterruptedException ee) {
-                    }
+                    Thread.sleep(2000);
+                } catch (InterruptedException ee) {
                 }
             } while (driver == null);
         } else {

@@ -3,6 +3,7 @@ package selenium;
 import date.Dates;
 import org.openqa.selenium.Platform;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.RemoteWebDriver;
@@ -14,7 +15,6 @@ import java.net.URL;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * User: YamStranger
@@ -23,6 +23,7 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class WebDriverHub {
     private static final Logger logger = LoggerFactory.getLogger(WebDriverHub.class);
+    private static int count = 0;
     private Semaphore availability = new Semaphore(Integer.MAX_VALUE);
     private Queue<WebDriver> drivers = new LinkedList<>();
     private final boolean reuse;
@@ -62,31 +63,41 @@ public class WebDriverHub {
 
         WebDriver driver = null;
         if (remote) {
-            boolean isFirefox = ThreadLocalRandom.current().nextBoolean();
-            do try {
-                if (isFirefox) {
-                    isFirefox = false;
-                    DesiredCapabilities firefox = DesiredCapabilities.firefox();
-                    firefox.setBrowserName("firefox");
-                    firefox.setPlatform(Platform.ANY);
-                    firefox.setVersion("ANY");
-                    driver = new RemoteWebDriver(new URL("http://127.0.0.1:4444/wd/hub"), firefox);
-                } else {
-                    isFirefox = true;
-                    DesiredCapabilities chrome = DesiredCapabilities.chrome();
-                    chrome.setBrowserName("chrome");
-                    chrome.setPlatform(Platform.ANY);
-                    chrome.setVersion("ANY");
-                    driver = new RemoteWebDriver(new URL("http://127.0.0.1:4444/wd/hub"), chrome);
-                }
-            } catch (Exception e) {
-                isFirefox = !isFirefox;
-                logger.error("some exception during requesting browser", e);
+            boolean isFirefox = true;
+            do {
                 try {
-                    Thread.sleep(2000);
-                } catch (InterruptedException ee) {
+                    if (isFirefox) {
+                        DesiredCapabilities firefox = DesiredCapabilities.firefox();
+                        firefox.setBrowserName("firefox");
+                        firefox.setPlatform(Platform.ANY);
+                        firefox.setVersion("ANY");
+                        driver = new RemoteWebDriver(new URL("http://127.0.0.1:4444/wd/hub"), firefox);
+                    } else {
+                        DesiredCapabilities chrome = DesiredCapabilities.chrome();
+                        chrome.setBrowserName("chrome");
+                        chrome.setPlatform(Platform.ANY);
+                        chrome.setVersion("ANY");
+                        driver = new RemoteWebDriver(new URL("http://127.0.0.1:4444/wd/hub"), chrome);
+                    }
+                } catch (WebDriverException ee) {
+                    if (ee.getMessage().contains("session cannot find")) {
+                        isFirefox = !isFirefox;
+                        logger.error("some exception during requesting browser, changing browser userFirefox=" + isFirefox, ee);
+                    }
+                    try {
+                        Thread.sleep(2000);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                } catch (Exception e) {
+                    logger.error("some exception during requesting browser", e);
+                    try {
+                        Thread.sleep(2000);
+                    } catch (InterruptedException ee) {
+                        Thread.currentThread().interrupt();
+                    }
                 }
-            } while (driver == null);
+            } while (driver == null && !Thread.currentThread().isInterrupted());
         } else {
             driver = new ChromeDriver();
         }

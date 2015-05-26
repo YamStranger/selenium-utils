@@ -24,7 +24,7 @@ import java.util.concurrent.Semaphore;
 public class WebDriverHub {
     private static final Logger logger = LoggerFactory.getLogger(WebDriverHub.class);
     private static int count = 0;
-    private Semaphore availability = new Semaphore(Integer.MAX_VALUE);
+    private Semaphore availability = new Semaphore(1, true);
     private Queue<WebDriver> drivers = new LinkedList<>();
     private final boolean reuse;
     private final boolean remote;
@@ -37,13 +37,13 @@ public class WebDriverHub {
 
     public void available(int drivers) {
         synchronized (this) {
-            this.availability = new Semaphore(drivers);
+            this.availability.release(drivers);
         }
     }
 
     public WebDriver driver() {
         try {
-            this.availability.acquire(1);
+            this.availability.acquire();
             logger.info("new browser request, left " + this.availability.availablePermits());
         } catch (InterruptedException e) {
         }
@@ -113,11 +113,12 @@ public class WebDriverHub {
         synchronized (this) {
             if (reuse) {
                 boolean alive = true;
-                if (driver.age() < 30) {
+                if (driver.age() < 600) {
                     try {
                         driver.getCurrentUrl();
                     } catch (Exception e) {
                         logger.error("trying to reuse browser, which is not alive ", e);
+                        logger.info("Browser too old");
                         alive = false;
                     }
                 } else {
@@ -125,7 +126,7 @@ public class WebDriverHub {
                     alive = false;
                 }
                 if (alive) {
-                    this.drivers.add(driver);
+                    this.drivers.add(driver.driver());
                 } else {
                     try {
                         driver.driver().quit();
@@ -140,13 +141,14 @@ public class WebDriverHub {
                     logger.error("trying to quit browser, cached error " + e);
                 }
             }
-            this.availability.release(1);
+            this.availability.release();
         }
     }
 
 
     public void quit() {
-        for (final WebDriver driver : drivers) {
+        WebDriver driver = null;
+        while ((driver = drivers.poll()) != null) {
             try {
                 driver.quit();
             } catch (Exception e) {

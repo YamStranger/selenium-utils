@@ -3,6 +3,8 @@ package selenium.elements;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 
+import java.util.List;
+
 /**
  * User: YamStranger
  * Date: 5/14/15
@@ -34,6 +36,25 @@ public final class Loader {
             throw exception;
         }
         return element;
+    }
+
+    public List<WebElement> all() throws ElementNotFoundException {
+        ElementNotFoundException exception = null;
+        List<WebElement> elements = null;
+        for (final Search search : searches) {
+            try {
+                elements.addAll(search.all(driver));
+            } catch (ElementNotFoundException elementNotFound) {
+                exception = elementNotFound;
+            }
+        }
+        if (elements.isEmpty()) {
+            if (exception == null) {
+                throw new RuntimeException("incorrect implementation");
+            }
+            throw exception;
+        }
+        return elements;
     }
 
     public boolean isExist() {

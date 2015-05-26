@@ -23,15 +23,19 @@ public class ManageableDriver implements WebDriver, JavascriptExecutor {
 
     public ManageableDriver(WebDriver driver, WebDriverHub hub, boolean reusable, Dates created) {
         this.driver = driver;
+        if (driver instanceof ManageableDriver) {
+            throw new RuntimeException("incorrect implementation");
+        }
         this.webDriverHub = hub;
         this.reusable = reusable;
         this.created = created;
     }
 
     public int age() {
-        return (int) this.created.difference(new Dates(), Calendar.SECOND);
+        return (int) new Dates().difference(this.created, Calendar.SECOND);
     }
-    protected WebDriver driver(){
+
+    protected WebDriver driver() {
         return driver;
     }
 

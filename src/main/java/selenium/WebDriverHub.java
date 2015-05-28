@@ -28,10 +28,14 @@ public class WebDriverHub {
     private Queue<WebDriver> drivers = new LinkedList<>();
     private final boolean reuse;
     private final boolean remote;
+    private final LinkedList<String> servers = new LinkedList<>();
+    private int secondsForWait;
 
-    public WebDriverHub(boolean reuse, boolean remote) {
+    public WebDriverHub(boolean reuse, boolean remote, LinkedList<String> servers, int secondsForWait) {
         this.reuse = reuse;
         this.remote = remote;
+        this.servers.addAll(servers);
+        this.secondsForWait = secondsForWait;
 
     }
 
@@ -66,19 +70,25 @@ public class WebDriverHub {
             boolean isFirefox = true;
             do {
                 try {
-                    if (isFirefox) {
+                    String server = null;
+                    synchronized (this) {
+                        server = this.servers.pollFirst();
+                        this.servers.addLast(server);
+                        logger.info("using " + server + " server");
+                    }
+/*                    if (isFirefox) {
                         DesiredCapabilities firefox = DesiredCapabilities.firefox();
                         firefox.setBrowserName("firefox");
                         firefox.setPlatform(Platform.ANY);
                         firefox.setVersion("ANY");
-                        driver = new RemoteWebDriver(new URL("http://127.0.0.1:4444/wd/hub"), firefox);
-                    } else {
-                        DesiredCapabilities chrome = DesiredCapabilities.chrome();
-                        chrome.setBrowserName("chrome");
-                        chrome.setPlatform(Platform.ANY);
-                        chrome.setVersion("ANY");
-                        driver = new RemoteWebDriver(new URL("http://127.0.0.1:4444/wd/hub"), chrome);
-                    }
+                        driver = new RemoteWebDriver(new URL(*//*"http://127.0.0.1:4444/wd/hub"*//*server), firefox);
+                    } else {*/
+                    DesiredCapabilities chrome = DesiredCapabilities.chrome();
+                    chrome.setBrowserName("chrome");
+                    chrome.setPlatform(Platform.ANY);
+                    chrome.setVersion("ANY");
+                    driver = new RemoteWebDriver(new URL(/*"http://127.0.0.1:4444/wd/hub"*/server), chrome);
+                    //  }
                 } catch (WebDriverException ee) {
                     if (ee.getMessage().contains("session cannot find")) {
                         isFirefox = !isFirefox;
@@ -106,14 +116,14 @@ public class WebDriverHub {
 
 
     public WebDriverWait driverWait(WebDriver driver) {
-        return new WebDriverWait(driver, 30);
+        return new WebDriverWait(driver, this.secondsForWait);
     }
 
     protected void release(ManageableDriver driver) {
         synchronized (this) {
             if (reuse) {
                 boolean alive = true;
-                if (driver.age() < 600) {
+                if (driver.age() < 180) {
                     try {
                         driver.getCurrentUrl();
                     } catch (Exception e) {

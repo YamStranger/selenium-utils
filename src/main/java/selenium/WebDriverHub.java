@@ -1,19 +1,19 @@
 package selenium;
 
 import date.Dates;
-import org.openqa.selenium.Platform;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URL;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 
 /**
@@ -28,14 +28,23 @@ public class WebDriverHub {
     private Queue<WebDriver> drivers = new LinkedList<>();
     private final boolean reuse;
     private final boolean remote;
-    private final LinkedList<String> servers = new LinkedList<>();
+    //private final LinkedList<String> servers = new LinkedList<>();
+    private final LinkedList<WebDriverHubConnector> connectors = new LinkedList<>();
     private int secondsForWait;
+    private final BlockingQueue<RemoteWebDriver> remoteDrivers;
 
-    public WebDriverHub(boolean reuse, boolean remote, LinkedList<String> servers, int secondsForWait) {
+    public WebDriverHub(boolean reuse, boolean remote, List<String> servers, int secondsForWait, int available) {
         this.reuse = reuse;
         this.remote = remote;
-        this.servers.addAll(servers);
+//        this.servers.addAll(servers);
         this.secondsForWait = secondsForWait;
+        this.remoteDrivers = new LinkedBlockingQueue<>(available);
+        this.available(available);
+        for (final String server : servers) {
+            WebDriverHubConnector connector = new WebDriverHubConnector(server, this.remoteDrivers);
+            connector.start();
+            this.connectors.add(connector);
+        }
 
     }
 
@@ -70,12 +79,13 @@ public class WebDriverHub {
             boolean isFirefox = true;
             do {
                 try {
-                    String server = null;
+/*                    String server = null;
                     synchronized (this) {
                         server = this.servers.pollFirst();
                         this.servers.addLast(server);
                         logger.info("using " + server + " server");
-                    }
+                    }*/
+                    driver = this.remoteDrivers.take();
 /*                    if (isFirefox) {
                         DesiredCapabilities firefox = DesiredCapabilities.firefox();
                         firefox.setBrowserName("firefox");
@@ -83,11 +93,11 @@ public class WebDriverHub {
                         firefox.setVersion("ANY");
                         driver = new RemoteWebDriver(new URL(*//*"http://127.0.0.1:4444/wd/hub"*//*server), firefox);
                     } else {*/
-                    DesiredCapabilities chrome = DesiredCapabilities.chrome();
+/*                    DesiredCapabilities chrome = DesiredCapabilities.chrome();
                     chrome.setBrowserName("chrome");
                     chrome.setPlatform(Platform.ANY);
                     chrome.setVersion("ANY");
-                    driver = new RemoteWebDriver(new URL(/*"http://127.0.0.1:4444/wd/hub"*/server), chrome);
+                    driver = new RemoteWebDriver(new URL(*//*"http://127.0.0.1:4444/wd/hub"*//*server), chrome);*/
                     //  }
                 } catch (WebDriverException ee) {
                     if (ee.getMessage().contains("session cannot find")) {
@@ -158,6 +168,12 @@ public class WebDriverHub {
 
     public void quit() {
         WebDriver driver = null;
+        for (final WebDriverHubConnector connector : this.connectors) {
+            connector.interrupt();
+        }
+        while ((driver = this.remoteDrivers.poll()) != null) {
+            drivers.add(driver);
+        }
         while ((driver = drivers.poll()) != null) {
             try {
                 driver.quit();
